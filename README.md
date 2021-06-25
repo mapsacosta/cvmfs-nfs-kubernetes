@@ -1,4 +1,4 @@
-# OpenShift NFS Server exporting CVMFS mounts
+# Kubernetes NFS Server exporting CVMFS mounts
 
 This project deploys an NFS server in a stateful set exposing a defined list of CVMFS mounts. It functions in a similar fasion as the cvmfs-csi approach but doesn't make use of privileged DaemonSets.
 
