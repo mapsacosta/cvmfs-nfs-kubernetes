@@ -1,0 +1,142 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  annotations:
+    description: Template for creating and deploying an NFS server exposing CVMFS mounts. Assumes a service account is created and has the right access granted.
+    iconClass: icon-gitlab
+    openshift.io/display-name: "Vanilla CVMFS NFS server"
+    tags: fs,cvmfs,nfs
+  managedFields:
+  - apiVersion: template.openshift.io/v1
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:description: {}
+          f:iconClass: {}
+          f:kubectl.kubernetes.io/last-applied-configuration: {}
+          f:openshift.io/display-name: {}
+          f:tags: {}
+      f:objects: {}
+      f:parameters: {}
+    manager: oc
+    operation: Update
+    time: 2021-04-16T16:10:16Z
+  name: nfs-cvmfs-server
+objects:
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    labels:
+      app: nfs-${EXPERIMENT}-server
+    name: nfs-${EXPERIMENT}-server-pvc
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    storageClassName: ${STORAGE_CLASS_NAME}
+    resources:
+      requests:
+        storage: 24Gi
+- apiVersion: apps/v1
+  kind: StatefulSet
+  metadata:
+    labels:
+      app: nfs-${EXPERIMENT}-server
+    name: nfs-${EXPERIMENT}-server
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: nfs-${EXPERIMENT}-server
+        statefulset: nfs-${EXPERIMENT}-server
+    template:
+      metadata:
+        labels:
+          app: nfs-${EXPERIMENT}-server
+          statefulset: nfs-${EXPERIMENT}-server      
+      spec:
+        containers:
+        - resources: {}
+          terminationMessagePath: /dev/termination-log
+          name: nfs-${EXPERIMENT}-server
+          env:
+            - name: CVMFS_REPOSITORIES
+              value: ${CVMFS_REPOSITORIES}
+          securityContext:
+            capabilities:
+              add:
+                - SYS_ADMIN
+            privileged: true
+          ports:
+            - name: nfs
+              containerPort: 2049
+              protocol: TCP
+            - name: mountd
+              containerPort: 20048
+              protocol: TCP
+            - name: rpcbind
+              containerPort: 111
+              protocol: TCP
+          volumeMounts:
+            - name: nfs-${EXPERIMENT}-server
+              mountPath: /var/lib/cvmfs
+          imagePullPolicy: Always
+          terminationMessagePolicy: File
+          image: 'ssiregistry.fnal.gov/eaf/nfs:nfs_cvmfs'
+        dnsPolicy: ClusterFirst
+        serviceAccountName: ${SERVICE_ACCT}
+        serviceAccount: ${SERVICE_ACCT}
+        volumes:
+          - name: nfs-${EXPERIMENT}-server
+            persistentVolumeClaim:
+              claimName: nfs-${EXPERIMENT}-server-pvc
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      template.openshift.io/expose-service_ip_port: "{.spec.clusterIP}:{.spec.ports[?(.name==\"nfs\")]."
+    labels:
+      app: nfs-${EXPERIMENT}-server
+    name: nfs-${EXPERIMENT}-server-svc
+  spec:
+    ports:
+      - name: nfs
+        port: 2049
+      - name: mountd
+        port: 20048
+      - name: rpcbind
+        port: 111
+    selector:
+      app: nfs-${EXPERIMENT}-server
+- kind: Route
+  apiVersion: route.openshift.io/v1
+  metadata:
+    annotations:
+    labels:
+      app: nfs-${EXPERIMENT}-server
+    name: nfs-${EXPERIMENT}-server-rt
+  spec:
+    to:
+      kind: Service
+      name: nfs-${EXPERIMENT}-server-svc
+    port:
+      targetPort: nfs
+    wildcardPolicy: None
+parameters:
+- name: CVMFS_REPOSITORIES
+  required: true
+  description: A space ' ' separated string of CVMFS repositories to provision
+  value: 'config-osg.opensciencegrid.org cms.cern.ch oasis.opensciencegrid.org singularity.opensciencegrid.org'
+- name: STORAGE_CLASS_NAME
+  required: true
+  description: The storage class name to provision NFS cache
+  value: ocs-storagecluster-cephfs
+- description: Which service account will be used for this deploymet (Might need special privileges)
+  name: SERVICE_ACCT
+  required: true
+  value: nfs-priv
+- description: Ideally, we should have one of these per experiment, or VO
+  name: EXPERIMENT
+  required: true
+  value: scd

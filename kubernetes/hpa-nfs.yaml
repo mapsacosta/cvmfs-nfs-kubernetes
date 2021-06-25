@@ -1,0 +1,16 @@
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-nfs-memory
+spec:
+  scaleTargetRef:
+    apiVersion: apps.openshift.io/v1
+    kind: StatefulSet
+    name: nfs-server
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: memory
+      targetAverageUtilization: 90
