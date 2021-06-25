@@ -26,17 +26,13 @@ create_dir() {
 
 #CVMFS_REPOSITORIES="config-osg.opensciencegrid.org cms.cern.ch oasis.opensciencegrid.org singularity.opensciencegrid.org"
 echo Starting cvmfs-nfs server for $CVMFS_REPOSITORIES
-echo "CVMFS_REPOSITORIES=$CVMFS_REPOSITORIES" >> /etc/cvmfs/default.local
+echo "CVMFS_REPOSITORIES=$(echo $CVMFS_REPOSITORIES | tr ' ' ,)" >> /etc/cvmfs/default.local
 cat /etc/cvmfs/default.local
 
 n_fsid=0
 
 for repo in $CVMFS_REPOSITORIES; 
    do echo "Processing -- $repo " ; 
-      if [[ $repo == *"osgstorage.org"* ]]; then
-         mkdir -p /etc/cvmfs/keys/osgstorage.org
-         ln -s /etc/cvmfs/keys/opensciencegrid.org/opensciencegrid.org.pub /etc/cvmfs/keys/osgstorage.org/opensciencegrid.org.pub
-      fi
       create_dir /cvmfs/$repo >/dev/null 2>&1
       echo "$repo /cvmfs/$repo cvmfs defaults,_netdev,nodev 0 0" >> /etc/fstab;  
       mount -t cvmfs $repo /cvmfs/$repo;
